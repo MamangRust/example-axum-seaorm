@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::entities::users;
 
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct UserResponse {
     pub id: i32,
     pub firstname: String,

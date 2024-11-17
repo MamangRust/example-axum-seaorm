@@ -18,7 +18,7 @@ pub use self::comment::CommentResponse;
 pub use self::user::UserResponse;
 
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
 pub struct ApiResponse<T> {
     pub status: String,
     pub message: String,
