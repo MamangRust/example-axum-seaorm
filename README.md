@@ -24,3 +24,8 @@ sea-orm-cli migrate up
 ```sh
 sea-orm-cli migrate down
 ```
+
+
+### OpenApi in Utoipa
+
+<img src="./image/example.png" alt="example" />

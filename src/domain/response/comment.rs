@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 
 use crate::entities::comments;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CommentResponse {
     pub id: i32,
     pub id_post_comment: i32,

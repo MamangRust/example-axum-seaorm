@@ -1,4 +1,5 @@
 use serde::Serialize;
+use utoipa::ToSchema;
 use core::fmt;
 use std::fmt::Formatter;
 
@@ -18,7 +19,7 @@ pub use self::comment::CommentResponse;
 pub use self::user::UserResponse;
 
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct ApiResponse<T> {
     pub status: String,
     pub message: String,
@@ -34,7 +35,7 @@ impl<T: Serialize> fmt::Display for ApiResponse<T> {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ErrorResponse {
     pub status: String,
     pub message: String,

@@ -1,13 +1,22 @@
 use axum::{
-    extract::{Path, State}, http::StatusCode, middleware, response::IntoResponse, routing::{delete, get, post, put}, Json, Router
+    extract::{Path, State}, http::StatusCode, middleware, response::IntoResponse, routing::{delete, get, post, put}, Json
 };
 use serde_json::json;
+use utoipa_axum::router::OpenApiRouter;
 use std::sync::Arc;
 use crate::{
-    middleware::jwt, domain::{CreatePostRequest, UpdatePostRequest}, state::AppState
+    middleware::jwt, domain::{ApiResponse, CreatePostRequest, PostRelationResponse, PostResponse, UpdatePostRequest}, state::AppState
 };
 
-async fn get_posts(State(data): State<Arc<AppState>>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+#[utoipa::path(
+    get,
+    path = "/api/posts",
+    responses(
+        (status = 200, description = "Get list of posts", body = ApiResponse<Vec<PostResponse>>)
+    ),
+    tag = "posts"
+)]
+pub async fn get_posts(State(data): State<Arc<AppState>>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     match data.di_container.post_service.get_all_posts().await {
         Ok(posts) => Ok((
             StatusCode::OK,
@@ -20,8 +29,16 @@ async fn get_posts(State(data): State<Arc<AppState>>) -> Result<impl IntoRespons
     }
 }
 
-
-async fn get_post(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+#[utoipa::path(
+    get,
+    path = "/api/posts/{id}",
+    responses(
+        (status = 200, description = "Get post by ID", body = ApiResponse<PostResponse>),
+        (status = 404, description = "Post not found")
+    ),
+    tag = "posts"
+)]
+pub async fn get_post(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     match data.di_container.post_service.get_post(post_id).await {
         Ok(Some(post)) => Ok((
             StatusCode::OK,
@@ -42,7 +59,16 @@ async fn get_post(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -
 }
 
 
-async fn get_post_relation(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+#[utoipa::path(
+    get,
+    path = "/api/posts/{id}/relation",
+    responses(
+        (status = 200, description = "Get related posts", body = ApiResponse<Vec<PostRelationResponse>>),
+        (status = 404, description = "Post not found")
+    ),
+    tag = "posts"
+)]
+pub async fn get_post_relation(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
 
     match data.di_container.post_service.get_post_relation(post_id).await {
         Ok(posts) => Ok((
@@ -57,7 +83,21 @@ async fn get_post_relation(State(data): State<Arc<AppState>>, Path(post_id): Pat
 }
 
 
-async fn create_post(
+#[utoipa::path(
+    post,
+    path = "/api/posts",
+    request_body = CreatePostRequest,
+    responses(
+        (status = 201, description = "Post created successfully", body = ApiResponse<PostResponse>),
+        (status = 400, description = "Invalid request body"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "posts"
+)]
+pub async fn create_post(
     State(data): State<Arc<AppState>>,
     Json(body): Json<CreatePostRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -73,8 +113,21 @@ async fn create_post(
     }
 }
 
-
-async fn update_post(
+#[utoipa::path(
+    put,
+    path = "/api/posts/{id}",
+    request_body = UpdatePostRequest,
+    responses(
+        (status = 200, description = "Post updated successfully", body = ApiResponse<PostResponse>),
+        (status = 400, description = "Invalid request body"),
+        (status = 404, description = "Post not found")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "posts"
+)]
+pub async fn update_post(
     State(data): State<Arc<AppState>>,
     Path(post_id): Path<i32>,
     Json(mut body): Json<UpdatePostRequest>,
@@ -96,8 +149,20 @@ async fn update_post(
 
 }
 
-
-async fn delete_post(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+#[utoipa::path(
+    delete,
+    path = "/api/posts/{id}",
+    responses(
+        (status = 200, description = "Post deleted successfully"),
+        (status = 404, description = "Post not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "posts"
+)]
+pub async fn delete_post(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
 
     match data.di_container.post_service.delete_post(post_id).await {
         Ok(_) => Ok((
@@ -116,20 +181,20 @@ async fn delete_post(State(data): State<Arc<AppState>>, Path(post_id): Path<i32>
 }
 
 
-pub fn post_routes(app_state: Arc<AppState>) -> Router {
-    let protected_routes = Router::new()
+pub fn post_routes(app_state: Arc<AppState>) -> OpenApiRouter {
+    let protected_routes = OpenApiRouter::new()
         .route("/api/posts", post(create_post))
-        .route("/api/posts/:id", get(get_post))
-        .route("/api/posts/:id", put(update_post))
-        .route("/api/posts/:id", delete(delete_post))
-        .route("/api/posts/:id/relation", get(get_post_relation))
+        .route("/api/posts/{id}", get(get_post))
+        .route("/api/posts/{id}", put(update_post))
+        .route("/api/posts/{id}", delete(delete_post))
+        .route("/api/posts/{id}/relation", get(get_post_relation))
         .route_layer(middleware::from_fn_with_state(app_state.clone(), jwt::auth)) // Middleware autentikasi
         .with_state(app_state.clone());
 
-    let public_routes = Router::new()
+    let public_routes = OpenApiRouter::new()
         .route("/posts", get(get_posts));
 
-    Router::new()
+        OpenApiRouter::new()
         .merge(protected_routes)
         .merge(public_routes)
         .with_state(app_state)

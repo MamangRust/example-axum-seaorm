@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub firstname: String,
     pub lastname: String,
@@ -9,7 +10,7 @@ pub struct RegisterRequest {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone,  Serialize, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,

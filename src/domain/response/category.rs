@@ -1,7 +1,8 @@
 use crate::entities::categories;
 use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[allow(non_snake_case)]
 pub struct CategoryResponse {
     pub id: i32,

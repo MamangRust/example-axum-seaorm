@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 
 use axum::{
-    extract::State, http::StatusCode, middleware, response::IntoResponse, routing::{get, post}, Extension, Json, Router
+    extract::State, http::StatusCode, middleware, response::IntoResponse, routing::{get, post}, Extension, Json
 };
 use serde_json::{json, Value};
-use crate::{domain::{LoginRequest, RegisterRequest}, middleware::jwt, state::AppState};
+use utoipa_axum::router::OpenApiRouter;
+use crate::{domain::{ApiResponse, LoginRequest, RegisterRequest, UserResponse}, middleware::jwt, state::AppState};
 
 
 
@@ -20,6 +21,16 @@ pub async fn health_checker_handler() -> impl IntoResponse {
     Json(json_response)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "Login successful", body = ApiResponse<UserResponse>),
+        (status = 401, description = "Unauthorized")
+    ),
+    tag = "auth"
+)]
 pub async fn register_user_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<RegisterRequest>
@@ -36,6 +47,16 @@ pub async fn register_user_handler(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = ApiResponse<String>),
+        (status = 401, description = "Unauthorized")
+    ),
+    tag = "auth"
+)]
 pub async fn login_user_handler(
     State(data): State<Arc<AppState>>,
     Json(body): Json<LoginRequest>,
@@ -52,7 +73,17 @@ pub async fn login_user_handler(
     }
 }
 
-
+#[utoipa::path(
+    get,
+    path = "/api/users/me",
+    responses(
+        (status = 200, description = "Get Me user", body = ApiResponse<UserResponse>)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "auth",
+)]
 pub async fn get_me_handler(
     State(data): State<Arc<AppState>>,
     Extension(user_id): Extension<i64>,
@@ -84,8 +115,8 @@ pub async fn get_me_handler(
 }
 
 
-pub fn auth_routes(app_state: Arc<AppState>) -> Router {
-    Router::new()
+pub fn auth_routes(app_state: Arc<AppState>) -> OpenApiRouter {
+    OpenApiRouter::new()
         .route("/api/healthchecker", get(health_checker_handler))
         .route("/api/auth/register", post(register_user_handler))
         .route("/api/auth/login", post(login_user_handler))

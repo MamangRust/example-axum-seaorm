@@ -1,8 +1,9 @@
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::entities::{comments, posts};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PostResponse {
     pub id: i32,
     pub title: String,
@@ -25,7 +26,7 @@ impl From<posts::Model> for PostResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PostRelationResponse {
     pub post_id: i32,
     pub title: String,

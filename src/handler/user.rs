@@ -4,17 +4,30 @@ use axum::{
     response::IntoResponse,
     middleware,
     routing::{delete, get, post, put},
-    Router,
 };
 use serde_json::json;
+use utoipa_axum::router::OpenApiRouter;
 use std::sync::Arc;
 use crate::{
-    domain::{CreateUserRequest, UpdateUserRequest},
+    domain::{ApiResponse, CreateUserRequest, UpdateUserRequest, UserResponse},
     middleware::jwt,
     state::AppState,
 };
 
-async fn create_user(
+#[utoipa::path(
+    post,
+    path = "/api/user",
+    responses(
+        (status = 200, description = "Create user", body = ApiResponse<UserResponse>),
+        (status = 400, description = "Invalid request body"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+pub async fn create_user(
     State(data): State<Arc<AppState>>,
     Json(body): Json<CreateUserRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -27,7 +40,20 @@ async fn create_user(
     }
 }
 
-async fn find_user_by_email(
+#[utoipa::path(
+    get,
+    path = "/api/user/{email}",
+    responses(
+        (status = 200, description = "Find Email user", body = ApiResponse<UserResponse>),
+        (status = 400, description = "Invalid request body"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+pub async fn find_user_by_email(
     State(data): State<Arc<AppState>>,
     Path(email): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -47,7 +73,20 @@ async fn find_user_by_email(
     }
 }
 
-async fn update_user(
+#[utoipa::path(
+    put,
+    path = "/api/user/{id}",
+    responses(
+        (status = 200, description = "Update user", body = ApiResponse<UserResponse>),
+        (status = 400, description = "Invalid request body"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+pub async fn update_user(
     State(data): State<Arc<AppState>>,
     Path(id): Path<i32>,
     Json(mut body): Json<UpdateUserRequest>,
@@ -70,7 +109,20 @@ async fn update_user(
     }
 }
 
-async fn delete_user(
+#[utoipa::path(
+    delete,
+    path = "/api/user/{email}",
+    responses(
+        (status = 200, description = "User category", body = Value),
+        (status = 400, description = "Invalid request body"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+pub async fn delete_user(
     State(data): State<Arc<AppState>>,
     Path(email): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -90,14 +142,14 @@ async fn delete_user(
 }
 
 
-pub fn user_routes(app_state: Arc<AppState>) -> Router {
-    let protected_routes = Router::new()
+pub fn user_routes(app_state: Arc<AppState>) -> OpenApiRouter {
+    let protected_routes = OpenApiRouter::new()
         .route("/api/user", post(create_user))
-        .route("/api/user/email/:email", get(find_user_by_email))
-        .route("/api/user/id/:id", put(update_user))
-        .route("/api/user/:email", delete(delete_user))
+        .route("/api/user/email/{email}", get(find_user_by_email))
+        .route("/api/user/id/{id}", put(update_user))
+        .route("/api/user/{email}", delete(delete_user))
         .route_layer(middleware::from_fn_with_state(app_state.clone(), jwt::auth))
         .with_state(app_state.clone());
 
-    Router::new().merge(protected_routes).with_state(app_state)
+        OpenApiRouter::new().merge(protected_routes).with_state(app_state)
 }

@@ -1,13 +1,24 @@
 use axum::{
-    extract::{Extension, Path, State}, http::StatusCode, middleware, response::IntoResponse, routing::{delete, get, post, put}, Json, Router
+    extract::{Extension, Path, State}, http::StatusCode, middleware, response::IntoResponse, routing::{delete, get, post, put}, Json
 };
 use serde_json::json;
+use utoipa_axum::router::OpenApiRouter;
 use std::sync::Arc;
 use crate::{
-    middleware::jwt, domain::{CreateCategoryRequest, UpdateCategoryRequest}, state::AppState
+    domain::{CategoryResponse, CreateCategoryRequest,ApiResponse,UpdateCategoryRequest}, middleware::jwt, state::AppState
 };
 
-// Get all categories handler
+#[utoipa::path(
+    get,
+    path = "/api/categories",
+    responses(
+        (status = 200, description = "List all category successfully", body = ApiResponse<Vec<CategoryResponse>>)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "category"
+)]
 pub async fn get_categories(
     State(data): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -23,7 +34,17 @@ pub async fn get_categories(
     }
 }
 
-// Get single category handler
+#[utoipa::path(
+    get,
+    path = "/api/categories/{id}",
+    responses(
+        (status = 200, description = "List all category successfully", body = ApiResponse<CategoryResponse>)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "category"
+)]
 pub async fn get_category(
     State(data): State<Arc<AppState>>,
     Path(id): Path<i32>,
@@ -48,7 +69,17 @@ pub async fn get_category(
     }
 }
 
-// Create category handler
+#[utoipa::path(
+    post,
+    path = "/api/categories",
+    responses(
+        (status = 200, description = "Create category", body = ApiResponse<CategoryResponse>)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "category"
+)]
 pub async fn create_category(
     State(data): State<Arc<AppState>>,
     Json(body): Json<CreateCategoryRequest>,
@@ -66,7 +97,17 @@ pub async fn create_category(
     }
 }
 
-// Update category handler
+#[utoipa::path(
+    put,
+    path = "/api/categories/{id}",
+    responses(
+        (status = 200, description = "Delete category", body = ApiResponse<CategoryResponse>)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "category"
+)]
 pub async fn update_category(
     State(data): State<Arc<AppState>>,
     Path(id): Path<i32>,
@@ -94,7 +135,17 @@ pub async fn update_category(
     }
 }
 
-// Delete category handler
+#[utoipa::path(
+    delete,
+    path = "/api/categories/{id}",
+    responses(
+        (status = 200, description = "Delete category", body = Value)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "category"
+)]
 pub async fn delete_category(
     State(data): State<Arc<AppState>>,
     Path(id): Path<i32>,
@@ -116,26 +167,20 @@ pub async fn delete_category(
 }
 
 
-pub fn category_routes(app_state: Arc<AppState>) -> Router {
-    let protected_routes = Router::new()
-        .route("/api/categories/:id", get(get_category))
+pub fn category_routes(app_state: Arc<AppState>) -> OpenApiRouter {
+    let protected_routes = OpenApiRouter::new()
+        .route("/api/categories/{id}", get(get_category))
         .route("/api/categories", post(create_category))
-        .route("/api/categories/:id", put(update_category))
-        .route("/api/categories/:id", delete(delete_category))
-        .route_layer(middleware::from_fn_with_state(app_state.clone(), jwt::auth)).with_state(app_state.clone());
+        .route("/api/categories/{id}", put(update_category))
+        .route("/api/categories/{id}", delete(delete_category))
+        .route_layer(middleware::from_fn_with_state(app_state.clone(), jwt::auth))
+        .with_state(app_state.clone());
 
-    let public_routes = Router::new()
+    let public_routes = OpenApiRouter::new()
         .route("/categories", get(get_categories));
 
-   
-     Router::new()
+    OpenApiRouter::new()
         .merge(protected_routes)
-        .merge(public_routes).with_state(app_state.clone())
+        .merge(public_routes)
+        .with_state(app_state.clone())
 }
-
-// // In main.rs or wherever you set up your app:
-// pub fn app(app_state: Arc<AppState>) -> Router {
-//     Router::new()
-//         .merge(category_routes(app_state.clone()))
-       
-// }

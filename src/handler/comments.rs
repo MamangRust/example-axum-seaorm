@@ -4,18 +4,29 @@ use axum::{
     middleware,
     response::IntoResponse,
     routing::{get, post, put, delete},
-    Json, Router,
+    Json
 };
 use serde_json::json;
+use utoipa_axum::router::OpenApiRouter;
 use std::sync::Arc;
 use crate::{
     middleware::jwt,
-    domain::{CreateCommentRequest, UpdateCommentRequest},
+    domain::{ApiResponse, CommentResponse, CreateCommentRequest, UpdateCommentRequest},
     state::AppState,
 };
 
-
-async fn get_comments(
+#[utoipa::path(
+    get,
+    path = "/api/comments",
+    responses(
+        (status = 200, description = "Get all comments", body = ApiResponse<Vec<CommentResponse>>)
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "comments"
+)]
+pub async fn get_comments(
     State(data): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
     match data.di_container.comment_service.get_comments().await {
@@ -31,8 +42,19 @@ async fn get_comments(
     }
 }
 
-// Handler untuk mendapatkan komentar berdasarkan ID
-async fn get_comment(
+#[utoipa::path(
+    get,
+    path = "/api/comments/{id}",
+    responses(
+        (status = 200, description = "Get a comment", body = ApiResponse<CommentResponse>),
+        (status = 404, description = "Comment not found")
+    ),
+    params(
+        ("id" = i32, Path, description = "Comment ID")
+    ),
+    tag = "comments"
+)]
+pub async fn get_comment(
     State(data): State<Arc<AppState>>,
     Path(comment_id): Path<i32>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -56,8 +78,17 @@ async fn get_comment(
     }
 }
 
-// Handler untuk membuat komentar baru
-async fn create_comment(
+#[utoipa::path(
+    post,
+    path = "/api/comments",
+    request_body = CreateCommentRequest,
+    responses(
+        (status = 201, description = "Comment created", body = ApiResponse<CommentResponse>),
+        (status = 400, description = "Invalid request body")
+    ),
+    tag = "comments"
+)]
+pub async fn create_comment(
     State(data): State<Arc<AppState>>,
     Json(body): Json<CreateCommentRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -74,8 +105,20 @@ async fn create_comment(
     }
 }
 
-// Handler untuk memperbarui komentar
-async fn update_comment(
+#[utoipa::path(
+    put,
+    path = "/api/comments/{id}",
+    request_body = UpdateCommentRequest,
+    responses(
+        (status = 200, description = "Comment updated", body = ApiResponse<CommentResponse>),
+        (status = 404, description = "Comment not found")
+    ),
+    params(
+        ("id" = i32, Path, description = "Comment ID")
+    ),
+    tag = "comments"
+)]
+pub async fn update_comment(
     State(data): State<Arc<AppState>>,
     Json(body): Json<UpdateCommentRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -99,8 +142,19 @@ async fn update_comment(
     }
 }
 
-// Handler untuk menghapus komentar
-async fn delete_comment(
+#[utoipa::path(
+    delete,
+    path = "/api/comments/{id}",
+    responses(
+        (status = 200, description = "Comment deleted successfully", body=Value),
+        (status = 500, description = "Failed to delete comment")
+    ),
+    params(
+        ("id" = i32, Path, description = "Comment ID")
+    ),
+    tag = "comments"
+)]
+pub async fn delete_comment(
     State(data): State<Arc<AppState>>,
     Path(comment_id): Path<i32>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
@@ -123,15 +177,15 @@ async fn delete_comment(
     }
 }
 
-pub fn comment_routes(app_state: Arc<AppState>) -> Router {
-    let protected_routes = Router::new()
+pub fn comment_routes(app_state: Arc<AppState>) -> OpenApiRouter {
+    let protected_routes = OpenApiRouter::new()
         .route("/api/comments", get(get_comments))
-        .route("/api/comments/:id", get(get_comment))
+        .route("/api/comments/{id}", get(get_comment))
         .route("/api/comments", post(create_comment))
-        .route("/api/comments/:id", put(update_comment))
-        .route("/api/comments/:id", delete(delete_comment))
+        .route("/api/comments/{id}", put(update_comment))
+        .route("/api/comments/{id}", delete(delete_comment))
         .route_layer(middleware::from_fn_with_state(app_state.clone(), jwt::auth))
         .with_state(app_state.clone());
 
-    Router::new().merge(protected_routes).with_state(app_state)
+        OpenApiRouter::new().merge(protected_routes).with_state(app_state)
 }
