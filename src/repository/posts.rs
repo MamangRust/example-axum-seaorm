@@ -3,8 +3,8 @@ use crate::domain::{CreatePostRequest, PostRelationResponse, UpdatePostRequest};
 use crate::entities::{comments, posts};
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter,
-    Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait,
+    PaginatorTrait, QueryFilter, QuerySelect, Set,
 };
 use tracing::{error, info};
 
@@ -20,8 +20,29 @@ impl PostRepository {
 
 #[async_trait]
 impl PostsRepositoryTrait for PostRepository {
-    async fn get_all_posts(&self) -> Result<Vec<posts::Model>, DbErr> {
-        posts::Entity::find().all(&self.db_pool).await
+    async fn get_all_posts(
+        &self,
+        page: i32,
+        page_size: i32,
+        search: Option<String>,
+    ) -> Result<(Vec<posts::Model>, i64), DbErr> {
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let mut query = posts::Entity::find();
+
+        if let Some(search) = search {
+            query = query.filter(posts::Column::Title.contains(&search));
+        }
+
+        let total_count = query.clone().count(&self.db_pool).await?;
+
+        let posts = query
+            .limit(page_size as u64)
+            .offset(((page - 1) * page_size) as u64)
+            .all(&self.db_pool)
+            .await?;
+
+        Ok((posts, total_count as i64))
     }
 
     async fn get_post(&self, post_id: i32) -> Result<Option<posts::Model>, DbErr> {
@@ -29,7 +50,6 @@ impl PostsRepositoryTrait for PostRepository {
     }
 
     async fn get_post_relation(&self, post_id: i32) -> Result<Vec<PostRelationResponse>, DbErr> {
-        // Log the start of the function
         info!("Fetching post relation for post ID: {}", post_id);
 
         match posts::Entity::find()
@@ -53,7 +73,6 @@ impl PostsRepositoryTrait for PostRepository {
                     })
                     .collect::<Vec<_>>();
 
-            
                 info!(
                     "Found {} related comments for post ID: {}",
                     result.len(),
@@ -63,7 +82,6 @@ impl PostsRepositoryTrait for PostRepository {
                 Ok(result)
             }
             Err(e) => {
-               
                 error!(
                     "Failed to fetch post relation for post ID: {}. Error: {:?}",
                     post_id, e

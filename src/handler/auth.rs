@@ -23,7 +23,7 @@ pub async fn health_checker_handler() -> impl IntoResponse {
 
 #[utoipa::path(
     post,
-    path = "/api/register",
+    path = "/api/auth/register",
     request_body = RegisterRequest,
     responses(
         (status = 200, description = "Login successful", body = ApiResponse<UserResponse>),
@@ -49,7 +49,7 @@ pub async fn register_user_handler(
 
 #[utoipa::path(
     post,
-    path = "/api/login",
+    path = "/api/auth/login",
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Login successful", body = ApiResponse<String>),
