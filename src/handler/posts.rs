@@ -97,7 +97,7 @@ pub async fn get_post_relation(
 #[utoipa::path(
     post,
     path = "/api/posts",
-    request_body = CreatePostRequest,
+    request_body(content = CreatePostRequest, content_type = "multipart/form-data"),
     responses(
         (status = 201, description = "Post created successfully", body = ApiResponse<PostResponse>),
         (status = 400, description = "Invalid request body"),
@@ -112,57 +112,99 @@ pub async fn create_post(
     State(data): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let mut post_data: Option<CreatePostRequest> = None;
+    let mut title: Option<String> = None;
+    let mut body: Option<String> = None;
+    let mut category_id: Option<i32> = None;
+    let mut user_id: Option<i32> = None;
+    let mut user_name: Option<String> = None;
+    let mut file_data: Option<(String, String, Vec<u8>)> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Failed to process form data"})),
-        )
-    })? {
-        if field.name() == Some("post_data") {
-            let data = field.bytes().await.map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"error": "Failed to read post data"})),
-                )
-            })?;
-            post_data = Some(serde_json::from_slice(&data).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"error": "Invalid post data format"})),
-                )
-            })?);
-            break;
-        }
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        match field.name() {
+            Some("title") => {
+                title = Some(field.text().await.expect("should be text for title field"));
+            }
+            Some("body") => {
+                body = Some(field.text().await.expect("should be text for body field"));
+            }
+            Some("category_id") => {
+                category_id = Some(
+                    field
+                        .text()
+                        .await
+                        .expect("should be text for category_id field")
+                        .parse()
+                        .expect("should be a number for category_id field"),
+                );
+            }
+            Some("user_id") => {
+                user_id = Some(
+                    field
+                        .text()
+                        .await
+                        .expect("should be text for user_id field")
+                        .parse()
+                        .expect("should be a number for user_id field"),
+                );
+            }
+            Some("user_name") => {
+                user_name = Some(
+                    field
+                        .text()
+                        .await
+                        .expect("should be text for user_name field"),
+                );
+            }
+            Some("file") => {
+                let file_name = field.file_name().map(ToString::to_string);
+                let content_type = field.content_type().map(ToString::to_string);
+                let bytes = field.bytes().await.expect("should be bytes for file field");
+
+                if let (Some(name), Some(content_type)) = (file_name, content_type) {
+                    if !bytes.is_empty() {
+                        file_data = Some((name, content_type, bytes.to_vec()));
+                    }
+                }
+            }
+            _ => (),
+        };
     }
 
-    let mut post_data = post_data.ok_or_else(|| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Missing post data"})),
-        )
-    })?;
+    let uploaded_file_name = if let Some((name, content_type, file_bytes)) = file_data {
+        let upload_result = data
+            .di_container
+            .file_service
+            .upload_image("posts", name, content_type, file_bytes)
+            .await;
 
-    let upload_result = data
-        .di_container
-        .file_service
-        .upload_image("posts", multipart)
-        .await;
-
-    let uploaded_file_name = match upload_result {
-        Ok(response) => response.file_name.clone(),
-        Err((status, response)) => {
-            return Err((
-                status,
-                Json(json!({
-                    "error": response.message
-                })),
-            ))
+        match upload_result {
+            Ok(response) => response.file_name.clone(),
+            Err((status, response)) => {
+                return Err((
+                    status,
+                    Json(json!({
+                        "error": response.message
+                    })),
+                ))
+            }
         }
+    } else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "File is required"
+            })),
+        ));
     };
 
-    post_data.img = uploaded_file_name;
+    let post_data = CreatePostRequest {
+        title: title.unwrap_or_default(),
+        body: body.unwrap_or_default(),
+        file: uploaded_file_name,
+        category_id: category_id.unwrap_or(0),
+        user_id: user_id.unwrap_or(0),
+        user_name: user_name.unwrap_or_default(),
+    };
 
     match data.di_container.post_service.create_post(&post_data).await {
         Ok(post) => Ok((StatusCode::CREATED, Json(json!(post)))),
@@ -179,7 +221,7 @@ pub async fn create_post(
     params(
         ("id" = i32, Path, description = "Post ID")
     ),
-    request_body = UpdatePostRequest,
+    request_body(content = UpdatePostRequest, content_type = "multipart/form-data"),
     responses(
         (status = 200, description = "Post updated successfully", body = ApiResponse<PostResponse>),
         (status = 400, description = "Invalid request body"),
@@ -195,59 +237,113 @@ pub async fn update_post(
     Path(post_id): Path<i32>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    let mut post_data: Option<UpdatePostRequest> = None;
+    let mut title: Option<String> = None;
+    let mut body: Option<String> = None;
+    let mut category_id: Option<i32> = None;
+    let mut user_id: Option<i32> = None;
+    let mut user_name: Option<String> = None;
+    let mut file_data: Option<(String, String, Vec<u8>)> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Failed to process form data"})),
-        )
-    })? {
-        if field.name() == Some("post_data") {
-            let data = field.bytes().await.map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"error": "Failed to read post data"})),
-                )
-            })?;
-            let mut post_req: UpdatePostRequest = serde_json::from_slice(&data).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"error": "Invalid post data format"})),
-                )
-            })?;
-            post_req.post_id = Some(post_id);
-            post_data = Some(post_req);
-            break;
-        }
-    }
-
-    let mut post_data = post_data.ok_or_else(|| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Missing post data"})),
-        )
-    })?;
-
-    let upload_result = data
-        .di_container
-        .file_service
-        .upload_image("posts", multipart)
-        .await;
-
-    let uploaded_file_name = match upload_result {
-        Ok(response) => response.file_name.clone(),
-        Err((status, response)) => {
-            return Err((
-                status,
-                Json(json!({
-                    "error": response.message
-                })),
-            ))
-        }
+    let old_post = match data.di_container.post_service.get_post(post_id).await {
+        Ok(post) => post.unwrap().data,
+        Err(e) => return Err((StatusCode::NOT_FOUND, Json(json!(e)))),
     };
 
-    post_data.img = uploaded_file_name;
+    if !old_post.img.is_empty() {
+        let _ = data
+            .di_container
+            .file_service
+            .delete_image("posts", &old_post.img)
+            .await;
+    }
+
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        match field.name() {
+            Some("title") => {
+                title = Some(field.text().await.expect("should be text for title field"));
+            }
+            Some("body") => {
+                body = Some(field.text().await.expect("should be text for body field"));
+            }
+            Some("category_id") => {
+                category_id = Some(
+                    field
+                        .text()
+                        .await
+                        .expect("should be text for category_id field")
+                        .parse()
+                        .expect("should be a number for category_id field"),
+                );
+            }
+            Some("user_id") => {
+                user_id = Some(
+                    field
+                        .text()
+                        .await
+                        .expect("should be text for user_id field")
+                        .parse()
+                        .expect("should be a number for user_id field"),
+                );
+            }
+            Some("user_name") => {
+                user_name = Some(
+                    field
+                        .text()
+                        .await
+                        .expect("should be text for user_name field"),
+                );
+            }
+            Some("file") => {
+                let file_name = field.file_name().map(ToString::to_string);
+                let content_type = field.content_type().map(ToString::to_string);
+                let bytes = field.bytes().await.expect("should be bytes for file field");
+
+                if let (Some(name), Some(content_type)) = (file_name, content_type) {
+                    if !bytes.is_empty() {
+                        file_data = Some((name, content_type, bytes.to_vec()));
+                    }
+                }
+            }
+            _ => (),
+        };
+    }
+
+    let uploaded_file_name = if let Some((name, content_type, file_bytes)) = file_data {
+        let upload_result = data
+            .di_container
+            .file_service
+            .upload_image("posts", name, content_type, file_bytes)
+            .await;
+
+        match upload_result {
+            Ok(response) => response.file_name.clone(),
+            Err((status, response)) => {
+                return Err((
+                    status,
+                    Json(json!({
+                        "error": response.message
+                    })),
+                ))
+            }
+        }
+    } else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "File is required"
+            })),
+        ));
+    };
+
+    let post_data = UpdatePostRequest {
+        post_id: Some(post_id),
+        title: title.unwrap_or_default(),
+        body: body.unwrap_or_default(),
+        file: uploaded_file_name,
+        category_id: category_id.unwrap_or(0),
+        user_id: user_id.unwrap_or(0),
+        user_name: user_name.unwrap_or_default(),
+    };
 
     match data.di_container.post_service.update_post(&post_data).await {
         Ok(post) => Ok((StatusCode::OK, Json(json!(post)))),

@@ -1,16 +1,19 @@
 mod auth;
 mod category;
+mod comments;
 mod posts;
 mod user;
-mod comments;
 
 use std::sync::Arc;
 
+use axum::extract::DefaultBodyLimit;
+use tokio::net::TcpListener;
+use tower_http::{limit::RequestBodyLimitLayer, services::ServeDir};
+use tracing_subscriber::fmt::layer;
 use utoipa::openapi::security::SecurityScheme;
 use utoipa::{Modify, OpenApi};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
-use tokio::net::TcpListener;
 
 use crate::state::AppState;
 
@@ -20,12 +23,11 @@ pub use self::comments::comment_routes;
 pub use self::posts::post_routes;
 pub use self::user::user_routes;
 
-
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        auth::login_user_handler, 
-        auth::get_me_handler, 
+        auth::login_user_handler,
+        auth::get_me_handler,
         auth::register_user_handler,
         user::create_user,
         user::find_user_by_email,
@@ -74,7 +76,6 @@ impl Modify for SecurityAddon {
     }
 }
 
-
 pub struct AppRouter;
 
 impl AppRouter {
@@ -87,10 +88,12 @@ impl AppRouter {
             .merge(comment_routes(shared_state.clone()))
             .merge(post_routes(shared_state.clone()))
             .merge(user_routes(shared_state.clone()))
-            .split_for_parts(); 
+            .layer(DefaultBodyLimit::disable())
+            .layer(RequestBodyLimitLayer::new(250 * 1024 * 1024))
+            .split_for_parts();
 
-        let router = router
-            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
+        let router =
+            router.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
 
         let addr = format!("0.0.0.0:{}", port);
         let listener = TcpListener::bind(addr).await?;

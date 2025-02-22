@@ -26,7 +26,7 @@ pub struct CreatePostRequest {
     pub title: String,
     pub body: String,
     #[schema(format = Binary, content_media_type = "application/octet-stream")]
-    pub img: String,
+    pub file: String,
     pub category_id: i32,
     pub user_id: i32,
     pub user_name: String,
@@ -38,7 +38,7 @@ pub struct UpdatePostRequest {
     pub title: String,
     pub body: String,
     #[schema(format = Binary, content_media_type = "application/octet-stream")]
-    pub img: String,
+    pub file: String,
     pub category_id: i32,
     pub user_id: i32,
     pub user_name: String,

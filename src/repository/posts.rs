@@ -96,7 +96,7 @@ impl PostsRepositoryTrait for PostRepository {
             title: Set(input.title.to_string()),
             body: Set(input.body.to_string()),
             slug: Set(input.title.to_string()),
-            img: Set(input.img.to_string()),
+            img: Set(input.file.to_string()),
             category_id: Set(input.category_id),
             user_id: Set(input.user_id),
             user_name: Set(input.user_name.to_string()),
@@ -126,7 +126,7 @@ impl PostsRepositoryTrait for PostRepository {
         let mut post: posts::ActiveModel = post.into();
         post.title = Set(input.title.to_string());
         post.body = Set(input.body.to_string());
-        post.img = Set(input.img.to_string());
+        post.img = Set(input.file.to_string());
         post.category_id = Set(input.category_id);
         post.user_id = Set(input.user_id);
         post.user_name = Set(input.user_name.to_string());

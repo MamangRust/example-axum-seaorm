@@ -12,7 +12,9 @@ pub trait FileServiceTrait {
     async fn upload_image(
         &self,
         upload_dir: &str,
-        mut multipart: Multipart,
+        original_filename: String,
+        content_type: String,
+        file_data: Vec<u8>,
     ) -> Result<Json<UploadResponse>, (StatusCode, Json<UploadResponse>)>;
     async fn delete_image(
         &self,
